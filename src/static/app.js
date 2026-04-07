@@ -499,6 +499,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Format the schedule using the new helper function
     const formattedSchedule = formatSchedule(details);
 
+    // Escape description once for use in HTML attributes
+    const escapedDescription = details.description.replace(/"/g, "&quot;");
+
     // Create activity tag
     const tagHtml = `
       <span class="activity-tag" style="background-color: ${typeInfo.color}; color: ${typeInfo.textColor}">
@@ -569,6 +572,12 @@ document.addEventListener("DOMContentLoaded", () => {
         `
         }
       </div>
+      <div class="share-buttons">
+        <span class="share-label">Share:</span>
+        <button class="share-btn share-twitter" title="Share on X (Twitter)" data-activity="${name}" data-description="${escapedDescription}">𝕏</button>
+        <button class="share-btn share-whatsapp" title="Share on WhatsApp" data-activity="${name}" data-description="${escapedDescription}">💬</button>
+        <button class="share-btn share-copy" title="Copy link" data-activity="${name}">🔗</button>
+      </div>
     `;
 
     // Add click handlers for delete buttons
@@ -587,7 +596,66 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    // Add click handlers for share buttons
+    activityCard.querySelector(".share-twitter").addEventListener("click", () => {
+      shareOnTwitter(name, details.description);
+    });
+    activityCard.querySelector(".share-whatsapp").addEventListener("click", () => {
+      shareOnWhatsApp(name, details.description);
+    });
+    activityCard.querySelector(".share-copy").addEventListener("click", (event) => {
+      copyActivityLink(name, event.currentTarget);
+    });
+
     activitiesList.appendChild(activityCard);
+  }
+
+  // Social sharing functions
+  function getActivityShareUrl(activityName) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("activity", activityName);
+    return url.toString();
+  }
+
+  function getShareMessage(activityName, description) {
+    return `Check out this activity at Mergington High School: ${activityName} - ${description}`;
+  }
+
+  function shareOnTwitter(activityName, description) {
+    const text = getShareMessage(activityName, description);
+    const url = getActivityShareUrl(activityName);
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function shareOnWhatsApp(activityName, description) {
+    const text = `${getShareMessage(activityName, description)} ${getActivityShareUrl(activityName)}`;
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function copyActivityLink(activityName, buttonEl) {
+    const url = getActivityShareUrl(activityName);
+    navigator.clipboard.writeText(url).then(() => {
+      const original = buttonEl.title;
+      buttonEl.title = "Copied!";
+      buttonEl.classList.add("share-copied");
+      setTimeout(() => {
+        buttonEl.title = original;
+        buttonEl.classList.remove("share-copied");
+      }, 1500);
+    }).catch(() => {
+      buttonEl.title = "Copy failed";
+      setTimeout(() => {
+        buttonEl.title = "Copy link";
+      }, 1500);
+    });
   }
 
   // Event listeners for search and filter
