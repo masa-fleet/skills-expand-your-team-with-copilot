@@ -29,8 +29,8 @@ def hash_password(password):
     )
     return f"pbkdf2_sha256${PBKDF2_ITERATIONS}${salt.hex()}${derived_key.hex()}"
 
-def verify_password(password: str, stored_password_hash: str) -> bool:
-    """Verify password against stored hash (PBKDF2 format, with legacy SHA-256 fallback)."""
+def verify_password(username: str, password: str, stored_password_hash: str) -> bool:
+    """Verify password against stored hash (PBKDF2 format, with legacy SHA-256 migration)."""
     if stored_password_hash.startswith("pbkdf2_sha256$"):
         try:
             _, iterations, salt_hex, expected_hex = stored_password_hash.split("$", 3)
@@ -45,8 +45,13 @@ def verify_password(password: str, stored_password_hash: str) -> bool:
             return False
 
     # Backward compatibility for legacy unsalted SHA-256 hashes already stored.
+    # If a legacy hash matches, migrate it to PBKDF2 immediately.
     legacy_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
-    return hmac.compare_digest(legacy_hash, stored_password_hash)
+    if hmac.compare_digest(legacy_hash, stored_password_hash):
+        new_hash = hash_password(password)
+        teachers_collection.update_one({"_id": username}, {"$set": {"password": new_hash}})
+        return True
+    return False
 
 @router.post("/login")
 def login(username: str, password: str) -> Dict[str, Any]:
@@ -54,7 +59,7 @@ def login(username: str, password: str) -> Dict[str, Any]:
     # Find the teacher in the database
     teacher = teachers_collection.find_one({"_id": username})
     
-    if not teacher or not verify_password(password, teacher["password"]):
+    if not teacher or not verify_password(username, password, teacher["password"]):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     
     # Return teacher information (excluding password)
